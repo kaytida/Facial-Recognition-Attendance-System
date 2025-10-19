@@ -1,2 +1,6 @@
 .venv
 __pycache__
+dataset
+models
+src/__pycache__
+embeddings_distribution.png

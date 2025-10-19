@@ -83,18 +83,3 @@ dataset/
 * Optionally implement logging or notifications
 
 ---
-
-## **Step 9: Resume / Project Showcase**
-
-* Highlight:
-
-  * Real-time facial recognition
-  * Automated attendance system
-  * Use of embeddings + classifier
-  * Live webcam and optional Streamlit UI
-
----
-
-If you want, I can **now write a ready-to-run `train.py` and `app.py`** that follows this exact sequence, so you can start building immediately.
-
-Do you want me to do that next?
