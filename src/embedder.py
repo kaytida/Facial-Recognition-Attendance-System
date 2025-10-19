@@ -11,17 +11,33 @@ def compute_face_embedding(image_path):
     return encoding
 
 
-def generate_embeddings(image_paths, labels):
+def generate_embeddings(image_paths, labels, progress_callback=None):
     embeddings, valid_labels = [], []
     total_images = len(image_paths)
     
     for i, (img_path, label) in enumerate(zip(image_paths, labels), 1):
-        print(f"Processing image {i}/{total_images}: {img_path}")
+        progress_msg = f"Processing image {i}/{total_images}: {img_path}"
+        print(progress_msg)
+        if progress_callback:
+            progress_callback(progress_msg)
+            
         embedding = compute_face_embedding(img_path)
         if embedding is not None:
             embeddings.append(embedding)
             valid_labels.append(label)
-
+            success_msg = f"✅ Successfully processed: {img_path}"
+            print(success_msg)
+            if progress_callback:
+                progress_callback(success_msg)
+        else:
+            error_msg = f"❌ Failed to process: {img_path}"
+            print(error_msg)
+            if progress_callback:
+                progress_callback(error_msg)
     
-    print(f"\nEmbedding generation complete! Processed {len(embeddings)}/{total_images} images successfully.")
+    final_msg = f"Embedding generation complete! Processed {len(embeddings)}/{total_images} images successfully."
+    print(final_msg)
+    if progress_callback:
+        progress_callback(final_msg)
+    
     return np.array(embeddings), np.array(valid_labels)

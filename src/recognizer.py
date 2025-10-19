@@ -2,6 +2,7 @@ import cv2
 import dlib
 import joblib
 import numpy as np
+from .camera_utils import force_release_camera, create_camera_connection, cleanup_camera_resources
 
 def recognize_from_webcam_svc(model_path="models/face_recognition_model.pkl"):
     # Paths
@@ -76,51 +77,68 @@ def recognize_from_webcam_knn(model_path="models/face_recognition_model.pkl", mi
     model = data["model"]
     threshold = data["threshold"]
 
-    video_capture = cv2.VideoCapture(0)
+    video_capture = None
     recognized_people = set()
+    
+    try:
+        # Force release any existing camera connections
+        force_release_camera()
+        
+        # Create new camera connection
+        video_capture = create_camera_connection()
+        if video_capture is None:
+            return []
+        
+        print("🎥 Starting attendance recognition... Press 'q' to quit.")
 
-    while True:
-        ret, frame = video_capture.read()
-        if not ret:
-            break
+        while True:
+            ret, frame = video_capture.read()
+            if not ret:
+                print("❌ Failed to grab frame. Exiting.")
+                break
 
-        small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
-        rgb_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
+            small_frame = cv2.resize(frame, (0, 0), fx=0.25, fy=0.25)
+            rgb_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
 
-        # Detect faces
-        faces = detector(rgb_frame, 1)
+            # Detect faces
+            faces = detector(rgb_frame, 1)
 
-        for face in faces:
-            # Skip small faces
-            if (face.right() - face.left()) < min_face_size or (face.bottom() - face.top()) < min_face_size:
-                continue
+            for face in faces:
+                # Skip small faces
+                if (face.right() - face.left()) < min_face_size or (face.bottom() - face.top()) < min_face_size:
+                    continue
 
-            # Get landmarks and embeddings
-            shape = shape_predictor(rgb_frame, face)
-            encoding = np.array(face_encoder.compute_face_descriptor(rgb_frame, shape, num_jitters=1))
+                # Get landmarks and embeddings
+                shape = shape_predictor(rgb_frame, face)
+                encoding = np.array(face_encoder.compute_face_descriptor(rgb_frame, shape, num_jitters=1))
 
-            # Predict closest neighbor
-            distances, indices = model.kneighbors([encoding])
-            distance = distances[0][0]
-            if distance < threshold:
-                name = model.predict([encoding])[0]
-            else:
-                name = "Unknown"
+                # Predict closest neighbor
+                distances, indices = model.kneighbors([encoding])
+                distance = distances[0][0]
+                if distance < threshold:
+                    name = model.predict([encoding])[0]
+                else:
+                    name = "Unknown"
 
-            # Scale rectangle back to original frame size
-            top, right, bottom, left = [v * 4 for v in (face.top(), face.right(), face.bottom(), face.left())]
-            cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
-            cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
-            if name != "Unknown":
-                recognized_people.add(name)
+                # Scale rectangle back to original frame size
+                top, right, bottom, left = [v * 4 for v in (face.top(), face.right(), face.bottom(), face.left())]
+                cv2.rectangle(frame, (left, top), (right, bottom), (0, 255, 0), 2)
+                cv2.putText(frame, name, (left, top - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.75, (255, 255, 255), 2)
+                if name != "Unknown":
+                    recognized_people.add(name)
 
-        cv2.imshow("Face Recognition Attendance", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
+            cv2.imshow("Face Recognition Attendance", frame)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
 
-    video_capture.release()
-    cv2.destroyAllWindows()
+    except Exception as e:
+        print(f"❌ Error during recognition: {str(e)}")
+    finally:
+        # Comprehensive cleanup of camera resources
+        cleanup_camera_resources(video_capture)
 
     print("\nAttendance Summary:")
     for person in recognized_people:
         print(f"- {person}")
+    
+    return list(recognized_people)
